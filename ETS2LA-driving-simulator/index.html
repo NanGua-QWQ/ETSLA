@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ETS2LA · 驾驶可视化预览</title>
+<style>
+:root{color-scheme:dark;--bg:#101114;--panel:#191b20;--line:#30333a;--muted:#9298a4;--blue:#38a5ef;--green:#43c78a;--red:#ed6262;--amber:#e9b75b}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:#f4f5f7;font:14px Inter,"Segoe UI",Arial,sans-serif}
+.app{height:100%;display:flex;flex-direction:column}.topbar{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid var(--line);background:#17191e}
+.brand{font-weight:700;letter-spacing:.2px}.brand small{font-weight:400;color:var(--muted);margin-left:10px}
+.actions{display:flex;align-items:center;gap:9px}.pill{border:1px solid var(--line);border-radius:20px;padding:6px 10px;color:#c6cad2;font-size:12px}.pill.live{border-color:#246b4b;color:#77e0ac}
+button{background:#252932;color:#e9edf4;border:1px solid #3b414d;border-radius:6px;padding:7px 11px;cursor:pointer}button:hover{background:#303642}button.active{background:#174d72;border-color:#287eaf}
+.main{position:relative;flex:1;min-height:0;background:#08090b}.viewer{position:absolute;inset:0;width:100%;height:100%;border:0;background:#08090b}
+.hud{position:absolute;inset:0;pointer-events:none;display:flex;justify-content:space-between;padding:18px}
+.left{display:flex;flex-direction:column;justify-content:space-between}.speedbox{display:flex;gap:14px;align-items:flex-start}
+.pedal{height:112px;width:9px;background:#ffffff20;border-radius:8px;position:relative;overflow:hidden;margin:2px 0 0 4px}
+.pedal .user,.pedal .actual{position:absolute;left:0;right:0;bottom:0;border-radius:8px 8px 0 0;height:0}
+.pedal .user{background:#38a5ef88}.pedal .actual{background:#38a5ef}
+.speed{font-size:68px;line-height:.95;font-weight:350;letter-spacing:-3px}.unit{font-size:12px;color:#d4d7dd;margin-top:7px}
+.leftbottom{display:flex;gap:8px;align-items:center}.tag{background:#111c;border:1px solid #ffffff25;border-radius:6px;padding:7px 10px;font-size:12px;color:#e0e4eb;backdrop-filter:blur(8px)}
+.right{display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;min-width:230px}
+.acc{display:flex;align-items:center;gap:8px;font-size:18px;color:var(--blue)}.acc.off{color:#a1a6b0}
+.limit{width:56px;height:56px;border:4px solid #d94d4d;border-radius:50%;display:grid;place-items:center;font-size:21px;background:#1119}
+.telemetry{width:236px;background:#111d;border:1px solid #ffffff25;border-radius:8px;padding:12px 13px;backdrop-filter:blur(10px)}
+.telemetry h3{font-size:12px;margin:0 0 9px;color:#cbd0d8;font-weight:600;display:flex;justify-content:space-between}
+.row{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #ffffff14;color:#b7bdc7;font-size:12px}.row b{color:#f1f3f6;font-weight:600}
+.state{display:inline-flex;align-items:center;gap:6px}.dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px #43c78a88}
+.bottomnote{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);font-size:11px;color:#d0d3da;background:#111c;border:1px solid #ffffff20;border-radius:20px;padding:7px 12px;white-space:nowrap;backdrop-filter:blur(8px)}
+.controlbar{height:66px;border-top:1px solid var(--line);background:#17191e;display:flex;align-items:center;justify-content:space-between;padding:0 18px;gap:12px}
+.controlgroup{display:flex;align-items:center;gap:8px}.control-label{color:var(--muted);font-size:12px;margin-right:3px}
+input[type=range]{width:110px;accent-color:var(--blue)}select{background:#252932;color:#eee;border:1px solid #3b414d;border-radius:6px;padding:7px}
+@media(max-width:700px){.topbar{padding:0 10px}.brand small{display:none}.hud{padding:10px}.speed{font-size:48px}.right{min-width:150px}.telemetry{width:175px}.controlbar{height:auto;min-height:72px;flex-wrap:wrap;padding:8px}.controlgroup{gap:5px}.bottomnote{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+ <header class="topbar">
+  <div class="brand">ETS2LA <small>驾驶可视化 · Browser Preview</small></div>
+  <div class="actions"><span class="pill live" id="connection">● 模拟遥测已连接</span><button id="pause">暂停模拟</button><button id="reset">重置</button></div>
+ </header>
+ <main class="main">
+  <iframe class="viewer" src="Visualization/index.html" title="ETS2LA 原始 3D 可视化"></iframe>
+  <div class="hud">
+   <section class="left">
+    <div class="speedbox">
+     <div class="pedal"><div class="user" id="userPedal"></div><div class="actual" id="actualPedal"></div></div>
+     <div><div class="speed"><span id="speed">72</span></div><div class="unit">km/h · 模拟车速</div></div>
+    </div>
+    <div class="leftbottom"><span class="tag" id="driveMode">● 自动驾驶辅助</span><span class="tag" id="laneState">车道居中：正常</span></div>
+   </section>
+   <section class="right">
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:14px">
+     <div class="acc" id="acc"><span>◉</span><span id="targetSpeed">80</span><small style="font-size:11px">ACC</small></div>
+     <div class="limit"><span id="speedLimit">90</span></div>
+    </div>
+    <div class="telemetry">
+     <h3><span>车辆状态</span><span class="state"><i class="dot"></i><span id="stateText">运行中</span></span></h3>
+     <div class="row"><span>转向角</span><b id="steering">+1.2°</b></div>
+     <div class="row"><span>油门 / 刹车</span><b id="pedalsText">18% / 0%</b></div>
+     <div class="row"><span>车道偏移</span><b id="offset">+0.04 m</b></div>
+     <div class="row"><span>方向灯</span><b id="indicator">关闭</b></div>
+     <div class="row"><span>巡航目标</span><b id="cruise">80 km/h</b></div>
+    </div>
+   </section>
+  </div>
+  <div class="bottomnote">3D 场景使用仓库原始 Visualization 构建产物 · HUD 数据为本地模拟，不会控制游戏</div>
+ </main>
+ <footer class="controlbar">
+  <div class="controlgroup"><span class="control-label">模拟模式</span><select id="mode"><option value="assist">车道辅助 + ACC</option><option value="full">全自动驾驶</option><option value="manual">手动驾驶</option><option value="brake">前车减速 / 制动</option></select></div>
+  <div class="controlgroup"><span class="control-label">目标车速</span><input id="target" type="range" min="40" max="110" value="80"><b id="targetValue">80</b><span class="control-label">km/h</span></div>
+  <div class="controlgroup"><span class="control-label">模拟速度</span><input id="rate" type="range" min="0" max="2" step=".1" value="1"><b id="rateValue">1.0×</b></div>
+ </footer>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let running=true, speed=72, phase=0, target=80, rate=1, mode='assist', last=performance.now();
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function update(dt){
+ if(!running)return;
+ phase+=dt*rate;
+ const wave=Math.sin(phase*.55), drift=Math.sin(phase*.8)*.18;
+ let desired=target;
+ if(mode==='brake') desired=38;
+ if(mode==='manual') desired=68+Math.sin(phase*.35)*10;
+ speed += clamp(desired-speed,-7*dt,3.2*dt);
+ speed=clamp(speed,0,130);
+ const accel=mode==='brake'?0:clamp((desired-speed)*.035+.16+wave*.035,0,.48);
+ const brake=mode==='brake'?clamp(.45+Math.sin(phase)*.08,0,.7):clamp((speed-desired)*.045,0,.3);
+ const actual=Math.max(accel,brake), user=mode==='manual'?accel:clamp(accel+.08*Math.sin(phase*1.4),0,1);
+ $('speed').textContent=Math.round(speed);
+ $('targetSpeed').textContent=mode==='manual'?'--':target;
+ $('speedLimit').textContent=90;
+ $('steering').textContent=(drift*7>=0?'+':'')+(drift*7).toFixed(1)+'°';
+ $('offset').textContent=(drift>=0?'+':'')+drift.toFixed(2)+' m';
+ $('pedalsText').textContent=Math.round(accel*100)+'% / '+Math.round(brake*100)+'%';
+ $('userPedal').style.height=(user*100)+'%'; $('actualPedal').style.height=(actual*100)+'%';
+ $('actualPedal').style.background=brake>.02?'#ed6262':'#38a5ef';
+ $('indicator').textContent=Math.sin(phase*.2)>0.94?'右转':'关闭';
+ $('cruise').textContent=(mode==='manual'?'关闭':target+' km/h');
+ $('laneState').textContent=mode==='manual'?'车道辅助：关闭':Math.abs(drift)>.14?'车道偏移：修正中':'车道居中：正常';
+ $('driveMode').textContent=mode==='full'?'● 全自动驾驶':mode==='manual'?'● 手动驾驶':mode==='brake'?'● 主动制动':'● 自动驾驶辅助';
+ $('acc').classList.toggle('off',mode==='manual');
+ $('stateText').textContent=mode==='brake'?'减速中':mode==='manual'?'人工控制':'运行中';
+ $('connection').textContent='● 模拟遥测已连接';
+}
+function frame(now){let dt=Math.min((now-last)/1000,.1);last=now;update(dt);requestAnimationFrame(frame)}
+$('pause').onclick=()=>{running=!running;$('pause').textContent=running?'暂停模拟':'继续模拟';$('connection').textContent=running?'● 模拟遥测已连接':'● 模拟已暂停'};
+$('reset').onclick=()=>{speed=72;phase=0;running=true;$('pause').textContent='暂停模拟';$('mode').value='assist';mode='assist';$('target').value=80;target=80;update(0)};
+$('mode').onchange=e=>mode=e.target.value;
+$('target').oninput=e=>{target=+e.target.value;$('targetValue').textContent=target;$('targetSpeed').textContent=target};
+$('rate').oninput=e=>{rate=+e.target.value;$('rateValue').textContent=rate.toFixed(1)+'×'};
+requestAnimationFrame(frame);
+</script>
+</body></html>
